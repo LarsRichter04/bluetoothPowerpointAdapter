@@ -1,16 +1,21 @@
 import time
+from enum import Enum
 
 import win32com.client
 from bluetooth import *
 import os
 
-
+class Actions(Enum):
+    OPENPPTX = b'openPPTX:'
+    NEXTSLIDE = b'NextSlide'
+    CLOSECONNECTION = b'CloseConnection'
+    PREVIOUSLIDE = b'PreviousSlide'
 class Ppt:
     def _startSlideShow(self):
         self.objCom.SlideShowSettings.Run()
 
     def __init__(self, path):
-        self.objCom = app.Presentations.Open(FileName=path.decode('utf-8'),
+        self.objCom = app.Presentations.Open(FileName=presentations_path+"\\"+path,
                                              WithWindow=0)
         self._startSlideShow()
 
@@ -37,22 +42,24 @@ class Ppt:
             return "Couldn't close Presentation"
 
 
-def handle_message(ppt, presentation_name):
+def handle_message(presentation_name):
+    ppt = Ppt(presentation_name)
     client_socket.send("opened:".encode() + presentation_name.encode())
     while True:
         _data = client_socket.recv(1024)
         if len(_data) == 0:
             break
-        print(_data)
-        if _data == b'NextSlide':
-            response = ppt.nextSlide()
-            client_socket.send(response.encode())
-        elif _data == b'CloseConnection':
-            client_socket.send(ppt.stopSlideShow().encode())
-            socket.close()
-            break
-        elif _data == b'PreviousSlide':
-            client_socket.send(ppt.previousSlide().encode())
+        match _data:
+            case Actions.NEXTSLIDE.value:
+                response = ppt.nextSlide()
+                client_socket.send(response.encode())
+            case Actions.PREVIOUSLIDE.value:
+                client_socket.send(ppt.previousSlide().encode())
+            case Actions.CLOSECONNECTION.value:
+                client_socket.send(ppt.stopSlideShow().encode())
+                socket.close()
+                break
+
 
 
 app = win32com.client.Dispatch("PowerPoint.Application")
@@ -87,10 +94,9 @@ while True:
     data = client_socket.recv(1024)
     if len(data) == 0:
         break
-    elif b'openPPTX:' in data:
+    elif Actions.OPENPPTX.value in data:
         print(data)
-        data = data.replace(b'openPPTX:', b'')
-        print(data.decode())
-        decoded = data.decode()
-        handle_message(Ppt((presentations_path + "\\").encode() + data), decoded)
+        dataArr = data.split(b':')
+        decoded = dataArr[1].decode()
+        handle_message(decoded)
         break
