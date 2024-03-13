@@ -21,7 +21,9 @@ class Commands(Enum):
     OPENED = b'2'
     ERROR = b'3'
 
-
+class ERRORS(Enum):
+    PRESENTATIONNOTAVAILABLE = b'0'
+    SLIDESHOWNOTAVAILABLE = b'1'
 
 class Ppt:
     def __start_slide_show(self):
@@ -38,21 +40,21 @@ class Ppt:
             return Commands.DONEACTION.value
         except com_error:
             print("Presentation not available")
-            return Commands.ERROR.value
+            return Commands.ERROR.value + b':' + ERRORS.SLIDESHOWNOTAVAILABLE.value
 
     def previous_slide(self):
         try:
             self.objCom.SlideShowWindow.View.Previous()
             return Commands.DONEACTION.value
         except com_error:
-            return Commands.ERROR.value
+            return Commands.ERROR.value + b':' + ERRORS.SLIDESHOWNOTAVAILABLE.value
 
     def stop_slide_show(self):
         try:
             self.objCom.SlideShowWindow.View.Exit()
             return Commands.DONEACTION.value
         except com_error:
-            return Commands.ERROR.value
+            return Commands.ERROR.value + b":" + ERRORS.PRESENTATIONNOTAVAILABLE.value
 
 
 def handle_message(presentation_index):
