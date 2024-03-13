@@ -8,11 +8,16 @@ import os
 from win32com.universal import com_error
 
 
-class Actions(Enum):
-    OPENPPTX = b'openPPTX:'
-    NEXTSLIDE = b'NextSlide'
-    CLOSECONNECTION = b'CloseConnection'
-    PREVIOUSLIDE = b'PreviousSlide'
+class Answers(Enum):
+    OPENPPTX = b'0'
+    NEXTSLIDE = b'1'
+    CLOSECONNECTION = b'3'
+    PREVIOUSLIDE = b'2'
+
+
+class Commands(Enum):
+    CONNECTIONESTABLISHED = b'0'
+    DONEACTION = b'1'
 
 
 class Ppt:
@@ -56,14 +61,15 @@ def handle_message(presentation_name):
         if len(_data) == 0:
             break
         match _data:
-            case Actions.NEXTSLIDE.value:
+            case Answers.NEXTSLIDE.value:
                 response = ppt.next_slide()
                 client.send(response.encode())
-            case Actions.PREVIOUSLIDE.value:
+            case Answers.PREVIOUSLIDE.value:
                 client.send(ppt.previous_slide().encode())
-            case Actions.CLOSECONNECTION.value:
+            case Answers.CLOSECONNECTION.value:
                 client.send(ppt.stop_slide_show().encode())
                 client.close()
+                break
 
 
 app = win32com.client.Dispatch("PowerPoint.Application")
@@ -79,7 +85,7 @@ socket.listen(1)
 presentations_path = os.getcwd()
 allPresentations = os.listdir(presentations_path)
 port = socket.getsockname()[1]
-advertise_service(socket, name="Sample Server",
+advertise_service(socket, name="Bluetooth Powerpoint Adapter",
                   service_id="5feedd1f-2df3-404c-a1ec-b7f32a6c9b11",
                   service_classes=["5feedd1f-2df3-404c-a1ec-b7f32a6c9b11", SERIAL_PORT_CLASS],
                   profiles=[SERIAL_PORT_PROFILE])
@@ -97,12 +103,12 @@ while True:
     data = client_socket.recv(1024)
     if len(data) == 0:
         break
-    elif Actions.OPENPPTX.value in data:
+    elif Answers.OPENPPTX.value in data:
         print(data)
         dataArr = data.split(b':')
         decoded = dataArr[1].decode()
         handle_message(decoded)
         break
-    elif Actions.CLOSECONNECTION.value == data:
+    elif Answers.CLOSECONNECTION.value == data:
         client_socket.close()
         break
