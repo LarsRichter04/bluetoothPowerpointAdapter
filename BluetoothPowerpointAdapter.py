@@ -1,65 +1,27 @@
 import time
-from enum import Enum
-
-import win32com.client
 from bluetooth import *
-import os
-
-from win32com.universal import com_error
-
-
-class Answers(Enum):
-    OPENPPTX = b'0'
-    NEXTSLIDE = b'\x01'
-    CLOSECONNECTION = b'\x03'
-    PREVIOUSLIDE = b'\x02'
+from enums import Commands, Answers_Pepper, Answers
+from ppt import Ppt
+import configparser
 
 
-class Commands(Enum):
-    CONNECTIONESTABLISHED = b'0'
-    DONEACTION = b'1'
-    OPENED = b'2'
-    ERROR = b'3'
+def read_config():
+    _config = configparser.ConfigParser()
+    _config.read('config.ini')
+    pepper_mac = _config.get('Addresses', 'pepper_mac')
+    bt_uuid = _config.get('Bluetooth', 'uuid')
 
-class ERRORS(Enum):
-    PRESENTATIONNOTAVAILABLE = b'0'
-    SLIDESHOWNOTAVAILABLE = b'1'
-
-class Ppt:
-    def __start_slide_show(self):
-        self.objCom.SlideShowSettings.Run()
-
-    def __init__(self, path):
-        self.objCom = app.Presentations.Open(FileName=presentations_path + "\\" + path,
-                                             WithWindow=0)
-        self.__start_slide_show()
-
-    def next_slide(self):
-        try:
-            self.objCom.SlideShowWindow.View.Next()
-            return Commands.DONEACTION.value
-        except com_error:
-            print("Presentation not available")
-            return Commands.ERROR.value + b':' + ERRORS.SLIDESHOWNOTAVAILABLE.value
-
-    def previous_slide(self):
-        try:
-            self.objCom.SlideShowWindow.View.Previous()
-            return Commands.DONEACTION.value
-        except com_error:
-            return Commands.ERROR.value + b':' + ERRORS.SLIDESHOWNOTAVAILABLE.value
-
-    def stop_slide_show(self):
-        try:
-            self.objCom.SlideShowWindow.View.Exit()
-            return Commands.DONEACTION.value
-        except com_error:
-            return Commands.ERROR.value + b":" + ERRORS.PRESENTATIONNOTAVAILABLE.value
+    config_values = {
+        'pepper_mac': pepper_mac,
+        'bt_uuid': bt_uuid
+    }
+    return config_values
 
 
-def handle_message(presentation_index):
+def handle_message(presentation_index, client_mac_address):
     presentation_index = int(presentation_index)
     ppt = Ppt(presentations[presentation_index])
+    answers = Answers_Pepper if client_mac_address == config['pepper_mac'] else Answers
     client = client_socket
     client.send(Commands.OPENED.value + b':' + presentations[presentation_index].encode())
     while True:
@@ -67,54 +29,49 @@ def handle_message(presentation_index):
         print(_data)
         if len(_data) == 0:
             break
-        match _data:
-            case Answers.NEXTSLIDE.value:
-                response = ppt.next_slide()
-                client.send(response)
-            case Answers.PREVIOUSLIDE.value:
-                client.send(ppt.previous_slide())
-            case Answers.CLOSECONNECTION.value:
-                client.send(ppt.stop_slide_show())
-                client.close()
-                break
+        elif answers.NEXT_SLIDE.value == _data:
+            client.send(ppt.next_slide())
+        elif answers.PREVIOUS_SLIDE.value == _data:
+            client.send(ppt.previous_slide())
+        elif answers.GOTO_SLIDE.value in _data:
+            client.send(ppt.goto_slide(_data.split(':')[1]))
+        elif answers.CLOSE_CONNECTION.value == _data:
+            client.send(ppt.stop_slide_show())
+            client.close()
+            break
 
 
-app = win32com.client.Dispatch("PowerPoint.Application")
-socket = BluetoothSocket(RFCOMM)
-try:
-    socket.bind(("", 0))
-except BluetoothError:
-    print("Device does not Support Bluetooth or Bluetooth is disabled")
-    time.sleep(5)
-    quit(42069)
-socket.listen(1)
-port = socket.getsockname()[1]
-uuid = "5feedd1f-2df3-404c-a1ec-b7f32a6c9b11"
-advertise_service(socket, name="Bluetooth Powerpoint Adapter",
-                  service_id=uuid,
-                  service_classes=[uuid, SERIAL_PORT_CLASS],
-                  profiles=[SERIAL_PORT_PROFILE])
-print("Waiting for connection on port", port)
-client_socket, client_address = socket.accept()
-presentations_path = os.getcwd()
-allPresentations = os.listdir(presentations_path)
-presentations = [x for x in allPresentations if ".pptx" in x]
-presentation_string = ";".join(presentations)
+if __name__ == "__main__":
+    socket = BluetoothSocket(RFCOMM)
+    config = read_config()
+    try:
+        socket.bind(("", 0))
+    except BluetoothError:
+        print("Device does not Support Bluetooth or Bluetooth is disabled")
+        time.sleep(5)
+        quit(0)
+    socket.listen(1)
+    uuid = config['bt_uuid']
+    advertise_service(socket, name="Bluetooth Powerpoint Adapter",
+                      service_id=uuid,
+                      service_classes=[uuid, SERIAL_PORT_CLASS],
+                      profiles=[SERIAL_PORT_PROFILE])
+    print("Successfully advertised service. Now waiting for connection...")
+    client_socket, client_address = socket.accept()
+    presentations = [x for x in os.listdir(os.getcwd()) if ".pptx" in x]
+    presentation_string = ";".join(presentations)
+    print("Accepted connection from", client_address[0])
+    client_socket.send(Commands.CONNECTION_ESTABLISHED.value + b":" + presentation_string.encode())
 
-print(presentation_string)
-print("Accepted connection from", client_address)
-client_socket.send(Commands.CONNECTIONESTABLISHED.value + b":" + presentation_string.encode())
-
-while True:
-    data = client_socket.recv(1024)
-    if len(data) == 0:
-        break
-    elif Answers.OPENPPTX.value in data:
-        print(data)
-        dataArr = data.split(b':')
-        decoded = dataArr[1].decode()
-        handle_message(decoded)
-        break
-    elif Answers.CLOSECONNECTION.value == data:
-        client_socket.close()
-        break
+    while True:
+        data = client_socket.recv(1024)
+        if len(data) == 0:
+            break
+        elif Answers.OPENPPTX.value in data:
+            print(data)
+            decoded = data.split(b':')[1].decode()
+            handle_message(decoded, client_address[0])
+            break
+        elif Answers.CLOSECONNECTION.value == data:
+            client_socket.close()
+            break
