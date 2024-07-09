@@ -1,2 +1,7 @@
 # Ignore all Powerpoints in Project
 *.pptx
+#ignore build and dist folder
+build/
+dist/
+#ignore config
+config.ini
