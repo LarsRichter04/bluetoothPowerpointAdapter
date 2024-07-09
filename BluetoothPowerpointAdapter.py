@@ -45,6 +45,7 @@ def handle_message(presentation_index, client_mac_address):
 
 
 if __name__ == "__main__":
+    print('Bluetooth Powerpoint Adapter V0.1.0')
     socket = BluetoothSocket(RFCOMM)
     config = read_config()
     try:
