@@ -2,11 +2,11 @@ from enum import Enum
 
 
 class Answers(Enum):
-    OPENPPTX = b'0'
-    NEXTSLIDE = b'\x01'
-    CLOSECONNECTION = b'\x03'
-    PREVIOUSLIDE = b'\x02'
-    GOTOSLIDE = b'\x04'
+    OPEN_PPTX = b'0'
+    NEXT_SLIDE = b'\x01'
+    CLOSE_CONNECTION = b'\x03'
+    PREVIOUS_SLIDE = b'\x02'
+    GOTO_SLIDE = b'\x04'
 
 
 class Answers_Pepper(Enum):
