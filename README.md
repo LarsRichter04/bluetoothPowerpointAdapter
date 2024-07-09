@@ -1,4 +1,4 @@
-# Bluetooth Powerpoint Adapter
+# Bluetooth Powerpoint Adapter V0.1.0
 
 Used to control powerpoints via a Bluetooth Connection
 
