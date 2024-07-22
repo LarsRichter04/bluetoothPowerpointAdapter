@@ -12,14 +12,7 @@ class EmittingStream:
         self.text_edit_widget = text_edit_widget
 
     def write(self, text):
-        match(text):
-            case "b'0:1'":
-                self.text_edit_widget.append("Opened PPP")
-            case "b'\\x01'":
-                self.text_edit_widget.append("Recieved Next Slide")
-            case _:
-                self.text_edit_widget.append(text)
-
+        self.text_edit_widget.append(text)
 
     def flush(self):
         pass
