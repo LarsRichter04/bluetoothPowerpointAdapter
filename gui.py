@@ -1,6 +1,13 @@
 import sys
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QTextEdit, QApplication
+from PyQt5.QtWidgets import (
+    QWidget,
+    QLabel,
+    QVBoxLayout,
+    QTextEdit,
+    QApplication,
+    QPushButton,
+)
 
 from enums import Answers, Answers_Pepper
 
@@ -8,6 +15,7 @@ from enums import Answers, Answers_Pepper
 class EmittingStream:
     def eprint(*args, **kwargs):
         print(*args, file=sys.stderr, **kwargs)
+
     def __init__(self, text_edit_widget):
         self.text_edit_widget = text_edit_widget
 
@@ -38,7 +46,26 @@ class Window(QWidget):
         self.text_edit.setReadOnly(True)
         layout.addWidget(self.text_edit)
 
+        self.pause_button = QPushButton("Pause", self)
+        layout.addWidget(self.pause_button)
+        self.pause_button.clicked.connect(self.on_pause_clicked)
+
+        self.bt_client_socket = None  # Socket-Referenz für Bluetooth-Verbindung
+
         sys.stdout = EmittingStream(self.text_edit)
+
+    def set_bt_client_socket(self, client_socket):
+        self.bt_client_socket = client_socket
+
+    def on_pause_clicked(self):
+        if self.bt_client_socket:
+            try:
+                self.bt_client_socket.send(b"PAUSE")
+                self.text_edit.append("PAUSE gesendet!")
+            except Exception as e:
+                self.text_edit.append(f"Fehler beim Senden: {e}")
+        else:
+            self.text_edit.append("Keine Bluetooth-Verbindung aktiv!")
 
     def closeEvent(self, event):
         sys.stdout = sys.__stdout__
